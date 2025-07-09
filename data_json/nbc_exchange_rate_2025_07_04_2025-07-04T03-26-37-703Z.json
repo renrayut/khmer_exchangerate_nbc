@@ -1,0 +1,190 @@
+{
+  "exchange_date": "2025-07-04",
+  "official_exchange_rate": "4017",
+  "detailed_rates": [
+    {
+      "Currency": "Australian Dollar",
+      "Symbol": "AUD/KHR",
+      "Unit": "1",
+      "Bid": "2644",
+      "Ask": "2670",
+      "Average": "2657.00"
+    },
+    {
+      "Currency": "Canadian Dollar",
+      "Symbol": "CAD/KHR",
+      "Unit": "1",
+      "Bid": "2956",
+      "Ask": "2986",
+      "Average": "2971.00"
+    },
+    {
+      "Currency": "Switzerland Franc",
+      "Symbol": "CHF/KHR",
+      "Unit": "1",
+      "Bid": "5076",
+      "Ask": "5127",
+      "Average": "5101.50"
+    },
+    {
+      "Currency": "Off-shore CNY",
+      "Symbol": "CNH/KHR",
+      "Unit": "1",
+      "Bid": "561",
+      "Ask": "567",
+      "Average": "564.00"
+    },
+    {
+      "Currency": "China Yuan",
+      "Symbol": "CNY/KHR",
+      "Unit": "1",
+      "Bid": "561",
+      "Ask": "567",
+      "Average": "564.00"
+    },
+    {
+      "Currency": "European Euro",
+      "Symbol": "EUR/KHR",
+      "Unit": "1",
+      "Bid": "4740",
+      "Ask": "4788",
+      "Average": "4764.00"
+    },
+    {
+      "Currency": "British Pound",
+      "Symbol": "GBP/KHR",
+      "Unit": "1",
+      "Bid": "5493",
+      "Ask": "5548",
+      "Average": "5520.50"
+    },
+    {
+      "Currency": "Hong Kong Dollar",
+      "Symbol": "HKD/KHR",
+      "Unit": "1",
+      "Bid": "512",
+      "Ask": "517",
+      "Average": "514.50"
+    },
+    {
+      "Currency": "Indonesian Rupiah",
+      "Symbol": "IDR/KHR",
+      "Unit": "1000",
+      "Bid": "247",
+      "Ask": "250",
+      "Average": "248.50"
+    },
+    {
+      "Currency": "Indian Rupee",
+      "Symbol": "INR/KHR",
+      "Unit": "100",
+      "Bid": "4710",
+      "Ask": "4757",
+      "Average": "4733.50"
+    },
+    {
+      "Currency": "Japanese Yen",
+      "Symbol": "JPY/KHR",
+      "Unit": "100",
+      "Bid": "2793",
+      "Ask": "2821",
+      "Average": "2807.00"
+    },
+    {
+      "Currency": "Korean Won",
+      "Symbol": "KRW/KHR",
+      "Unit": "100",
+      "Bid": "295",
+      "Ask": "298",
+      "Average": "296.50"
+    },
+    {
+      "Currency": "Laotian Kip",
+      "Symbol": "LAK/KHR",
+      "Unit": "1000",
+      "Bid": "188",
+      "Ask": "190",
+      "Average": "189.00"
+    },
+    {
+      "Currency": "Myanmar Kyat",
+      "Symbol": "MMK/KHR",
+      "Unit": "100",
+      "Bid": "192",
+      "Ask": "194",
+      "Average": "193.00"
+    },
+    {
+      "Currency": "Malaysian Ringgit",
+      "Symbol": "MYR/KHR",
+      "Unit": "1",
+      "Bid": "953",
+      "Ask": "962",
+      "Average": "957.50"
+    },
+    {
+      "Currency": "New Zealand Dollar",
+      "Symbol": "NZD/KHR",
+      "Unit": "1",
+      "Bid": "2442",
+      "Ask": "2466",
+      "Average": "2454.00"
+    },
+    {
+      "Currency": "Philippine Peso",
+      "Symbol": "PHP/KHR",
+      "Unit": "100",
+      "Bid": "7132",
+      "Ask": "7204",
+      "Average": "7168.00"
+    },
+    {
+      "Currency": "Special Drawing Right",
+      "Symbol": "SDR/KHR",
+      "Unit": "1",
+      "Bid": "5526",
+      "Ask": "5581",
+      "Average": "5553.50"
+    },
+    {
+      "Currency": "Swedish Krona",
+      "Symbol": "SEK/KHR",
+      "Unit": "1",
+      "Bid": "421",
+      "Ask": "426",
+      "Average": "423.50"
+    },
+    {
+      "Currency": "Singapore Dollar",
+      "Symbol": "SGD/KHR",
+      "Unit": "1",
+      "Bid": "3158",
+      "Ask": "3190",
+      "Average": "3174.00"
+    },
+    {
+      "Currency": "Thai Baht",
+      "Symbol": "THB/KHR",
+      "Unit": "1",
+      "Bid": "124",
+      "Ask": "125",
+      "Average": "124.50"
+    },
+    {
+      "Currency": "Taiwan Dollar",
+      "Symbol": "TWD/KHR",
+      "Unit": "1",
+      "Bid": "139",
+      "Ask": "140",
+      "Average": "139.50"
+    },
+    {
+      "Currency": "Vietnamese Dong",
+      "Symbol": "VND/KHR",
+      "Unit": "1000",
+      "Bid": "154",
+      "Ask": "155",
+      "Average": "154.50"
+    }
+  ]
+}
