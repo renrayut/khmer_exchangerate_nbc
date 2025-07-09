@@ -1,4 +1,4 @@
-// index.js - Main application file for Express server, scraping, and HTML table generation
+// index.js - Main application file for Express server, scraping, and Telegram integration
 
 /**
  * @file This script sets up an Express server to expose various web scraping endpoints.
@@ -7,9 +7,12 @@
  * saves an image of the table, and saves the data as a JSON file.
  * A new /nbc-filtered-exr-table endpoint is added to display and save a table
  * for specific currencies.
- * It also provides an endpoint to generate a chart image from NBC data.
+ * A new /api/daily-report endpoint is added to trigger daily image sending to Telegram.
  * @description Uses Puppeteer for web scraping and Chart.js for data visualization,
  * and Tailwind CSS for HTML styling.
+ *
+ * IMPORTANT: This file is configured for Vercel serverless deployment.
+ * The app.listen() call is removed, and the Express app instance is exported.
  */
 
 // Load environment variables from .env file
@@ -19,14 +22,18 @@ const express = require('express');
 const puppeteer = require('puppeteer');
 const fs = require('fs'); // Node.js File System module to save the image and JSON
 const path = require('path'); // Node.js Path module for handling file paths
+const fetch = require('node-fetch'); // For making HTTP requests to Telegram API
 
 const app = express();
 
 // Retrieve environment variables
-const PORT = process.env.PORT || 3000; // Default to 3000 if PORT is not set
+// Note: PORT is not used in Vercel's serverless environment, but kept for local development clarity.
+const PORT = process.env.PORT || 3000;
 const NBC_WEBSITE = process.env.NBC_WEBSITE;
 const NSSF_WEBSITE = process.env.NSSF_WEBSITE;
 const GDT_WEBSITE = process.env.GDT_WEBSITE;
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 // Middleware to parse JSON bodies (if needed for other routes, though not directly used here)
 app.use(express.json());
@@ -40,84 +47,28 @@ app.use(express.json());
  * - date (optional): The date in 'YYYY-MM-DD' format. If not provided, scrapes for the current date on the page.
  * Returns: HTML page containing the exchange rate data in a styled table.
  * Side Effects:
- * - Saves the HTML table as a PNG image in the /images/ folder.
- * - Saves the scraped data as a JSON file in the /data_json/ folder.
+ * - Saves the HTML table as a PNG image in the /images/ folder (locally during development, won't persist on Vercel).
+ * - Saves the scraped data as a JSON file in the /data_json/ folder (locally during development, won't persist on Vercel).
  */
 app.get('/nbc-exr-rate', async (req, res) => {
     const date = req.query.date ?? ''; // Get date from query parameter, default to empty string
     console.log(`Request received for NBC exchange rate (HTML, Image, JSON) for date: ${date || 'current'}`);
 
-    let browser; // Declare browser outside try-catch for finally block access
     try {
         const data = await scrapeNBC(date);
         const htmlTable = generateHtmlTable(data, "National Bank of Cambodia Exchange Rates"); // Pass default title
 
-        // --- Save JSON data to folder ---
-        if (data && data.exchange_date) {
-            const dataDir = './data_json';
-            if (!fs.existsSync(dataDir)) {
-                fs.mkdirSync(dataDir, { recursive: true });
-                console.log(`Created directory: ${dataDir}`);
-            }
+        // Save JSON data (Note: This will save locally during development, but won't persist on Vercel's serverless environment)
+        await saveJsonData(data);
 
-            const now = new Date();
-            const timestamp = now.toISOString().replace(/[:.]/g, '-'); //YYYY-MM-DDTHH-MM-SS-SSSZ
-            const jsonFilename = `${dataDir}/nbc_exchange_rate_${data.exchange_date.replace(/-/g, '_')}_${timestamp}.json`;
-
-            try {
-                fs.writeFileSync(jsonFilename, JSON.stringify(data, null, 2), 'utf8');
-                console.log(`JSON data saved to ${jsonFilename}`);
-            } catch (fileError) {
-                console.error('Error saving JSON data to file:', fileError);
-            }
-        }
-        // --- End Save JSON data to folder ---
-
-
-        // --- Save HTML table as Image ---
-        const imageDir = './images';
-        if (!fs.existsSync(imageDir)) {
-            fs.mkdirSync(imageDir, { recursive: true });
-            console.log(`Created directory: ${imageDir}`);
-        }
-
-        browser = await puppeteer.launch({ headless: 'new' });
-        const page = await browser.newPage();
-
-        // Set content and wait for it to load
-        await page.setContent(htmlTable, { waitUntil: 'networkidle0' });
-
-        // Get the full scroll height of the page content
-        const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
-        // Ensure the full table is visible for screenshot
-        await page.setViewport({ width: 1000, height: Math.max(bodyHeight, 800) });
-
-        // Define a selector for the main content or the table itself
-        const containerSelector = '.container'; // Adjust this if your main container has a different class/id
-        const container = await page.$(containerSelector);
-
-        if (container) {
-            const now = new Date();
-            const timestamp = now.toISOString().replace(/[:.]/g, '-'); //YYYY-MM-DDTHH-MM-SS-SSSZ
-            const imagePath = path.join(imageDir, `nbc_exchange_rate_table_${data.exchange_date.replace(/-/g, '_')}_${timestamp}.png`);
-
-            await container.screenshot({ path: imagePath, fullPage: false });
-            console.log(`HTML table image saved to ${imagePath}`);
-        } else {
-            console.warn('Could not find the main container for screenshot. Skipping image save.');
-        }
-        // --- End Save HTML table as Image ---
+        // Save HTML table as Image (Note: This will save locally during development, but won't persist on Vercel's serverless environment)
+        await saveHtmlTableAsImage(htmlTable, data.exchange_date);
 
         res.setHeader('Content-Type', 'text/html');
         res.send(htmlTable); // Send HTML table to the browser
     } catch (e) {
         console.error('Error in /nbc-exr-rate route:', e);
         res.status(500).setHeader('Content-Type', 'text/plain').send(`Failed to retrieve NBC exchange rate data: ${e.message}`);
-    } finally {
-        if (browser) {
-            await browser.close();
-            console.log('Browser closed after HTML table processing.');
-        }
     }
 });
 
@@ -129,7 +80,7 @@ app.get('/nbc-exr-rate', async (req, res) => {
  * - date (optional): The date in 'YYYY-MM-DD' format. If not provided, scrapes for the current date on the page.
  * Returns: HTML page containing the filtered exchange rate data in a styled table.
  * Side Effects:
- * - Saves the filtered HTML table as a PNG image in the /images/ folder.
+ * - Saves the filtered HTML table as a PNG image in the /images/ folder (locally during development, won't persist on Vercel).
  */
 app.get('/nbc-filtered-exr-table', async (req, res) => {
     const date = req.query.date ?? '';
@@ -149,7 +100,6 @@ app.get('/nbc-filtered-exr-table', async (req, res) => {
         "Japanese Yen"
     ];
 
-    let browser;
     try {
         const fullData = await scrapeNBC(date);
 
@@ -166,48 +116,16 @@ app.get('/nbc-filtered-exr-table', async (req, res) => {
             detailed_rates: filteredRates
         };
 
-        const htmlTable = generateHtmlTable(filteredData, "អត្រាប្តូរប្រាក់ NBC Exchange Rates"); // Use a specific title for filtered table
+        const htmlTable = generateHtmlTable(filteredData, "Filtered NBC Exchange Rates"); // Use a specific title for filtered table
 
-        // --- Save Filtered HTML table as Image ---
-        const imageDir = './images';
-        if (!fs.existsSync(imageDir)) {
-            fs.mkdirSync(imageDir, { recursive: true });
-            console.log(`Created directory: ${imageDir}`);
-        }
-
-        browser = await puppeteer.launch({ headless: 'new' });
-        const page = await browser.newPage();
-
-        await page.setContent(htmlTable, { waitUntil: 'networkidle0' });
-
-        const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
-        await page.setViewport({ width: 1000, height: Math.max(bodyHeight, 800) });
-
-        const containerSelector = '.container';
-        const container = await page.$(containerSelector);
-
-        if (container) {
-            const now = new Date();
-            const timestamp = now.toISOString().replace(/[:.]/g, '-');
-            const imagePath = path.join(imageDir, `nbc_filtered_exchange_rate_table_${filteredData.exchange_date.replace(/-/g, '_')}_${timestamp}.png`);
-
-            await container.screenshot({ path: imagePath, fullPage: false });
-            console.log(`Filtered HTML table image saved to ${imagePath}`);
-        } else {
-            console.warn('Could not find the main container for filtered HTML table screenshot. Skipping image save.');
-        }
-        // --- End Save Filtered HTML table as Image ---
+        // Save Filtered HTML table as Image (Note: This will save locally during development, but won't persist on Vercel)
+        await saveHtmlTableAsImage(htmlTable, filteredData.exchange_date, true); // Pass true for filtered
 
         res.setHeader('Content-Type', 'text/html');
         res.send(htmlTable);
     } catch (e) {
         console.error('Error in /nbc-filtered-exr-table route:', e);
         res.status(500).setHeader('Content-Type', 'text/plain').send(`Failed to retrieve filtered NBC exchange rate data: ${e.message}`);
-    } finally {
-        if (browser) {
-            await browser.close();
-            console.log('Browser closed after filtered HTML table processing.');
-        }
     }
 });
 
@@ -279,6 +197,59 @@ app.get('/nbc-exr-chart', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/daily-report
+ * Endpoint to trigger the daily exchange rate report and send it to Telegram.
+ * This endpoint is intended to be called by a cron job (e.g., Vercel Cron).
+ * Query Parameters:
+ * - date (optional): The date in 'YYYY-MM-DD' format. If not provided, scrapes for the current date on the page.
+ * Returns: JSON object indicating the status of the report generation and sending.
+ */
+app.get('/api/daily-report', async (req, res) => {
+    const date = req.query.date ?? ''; // Get date from query parameter, default to empty string
+    console.log(`Daily report request received for date: ${date || 'current'}`);
+
+    try {
+        const data = await scrapeNBC(date);
+        const htmlTable = generateHtmlTable(data, "National Bank of Cambodia Daily Exchange Rates");
+
+        // Save HTML table as Image (this will create a temporary file on Vercel for sending to Telegram)
+        const imagePath = await saveHtmlTableAsImage(htmlTable, data.exchange_date, false, true);
+
+        if (imagePath) {
+            // Send the image to Telegram
+            const caption = `Daily NBC Exchange Rates for ${data.exchange_date}\nOfficial Rate: ${data.official_exchange_rate}`;
+            await sendImageToTelegram(imagePath, caption);
+            console.log('Daily report sent to Telegram successfully.');
+
+            // Clean up the temporary image file after sending
+            fs.unlink(imagePath, (err) => {
+                if (err) console.error('Error deleting temporary image file:', err);
+                else console.log('Temporary image file deleted.');
+            });
+
+            res.status(200).json({
+                message: 'Daily report generated and sent to Telegram.',
+                date: data.exchange_date,
+                imagePath: imagePath // Note: This path is local to the serverless function, not publicly accessible
+            });
+        } else {
+            console.error('Failed to generate image for daily report.');
+            res.status(500).json({
+                error: 'Failed to generate image for daily report.',
+                date: data.exchange_date
+            });
+        }
+
+    } catch (e) {
+        console.error('Error in /api/daily-report:', e);
+        res.status(500).json({
+            error: 'Failed to generate and send daily report.',
+            details: e.message
+        });
+    }
+});
+
 
 /**
  * GET /nssf-exr-rate
@@ -318,18 +289,23 @@ app.get('/exr-rate', async (req, res) => {
     }
 });
 
-// --- Server Start ---
-app.listen(PORT, function () {
-    console.log(`Server listening on port ${PORT}!`);
-    console.log(`Access NBC Exchange Rate (HTML Table, Image & JSON Save): http://localhost:${PORT}/nbc-exr-rate?date=2025-07-04`);
-    console.log(`Access Filtered NBC Exchange Rate (HTML Table & Image Save): http://localhost:${PORT}/nbc-filtered-exr-table?date=2025-07-04`);
-    console.log(`Access NBC Exchange Rate Chart (PNG): http://localhost:${PORT}/nbc-exr-chart?date=2025-07-04`);
-    console.log(`Access NSSF Exchange Rate (JSON): http://localhost:${PORT}/nssf-exr-rate`);
-    console.log(`Access GDT Exchange Rate (JSON): http://localhost:${PORT}/exr-rate`);
-});
+// --- Server Start (for local development only) ---
+// This block will only execute when running locally with `node index.js` or `npm start`
+// It will be ignored by Vercel's serverless environment.
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, function () {
+        console.log(`Server listening on port ${PORT}!`);
+        console.log(`Access NBC Exchange Rate (HTML Table, Image & JSON Save): http://localhost:${PORT}/nbc-exr-rate?date=2025-07-04`);
+        console.log(`Access Filtered NBC Exchange Rate (HTML Table & Image Save): http://localhost:${PORT}/nbc-filtered-exr-table?date=2025-07-04`);
+        console.log(`Access NBC Exchange Rate Chart (PNG): http://localhost:${PORT}/nbc-exr-chart?date=2025-07-04`);
+        console.log(`Trigger Daily Telegram Report: http://localhost:${PORT}/api/daily-report`); // For testing locally
+        console.log(`Access NSSF Exchange Rate (JSON): http://localhost:${PORT}/nssf-exr-rate`);
+        console.log(`Access GDT Exchange Rate (JSON): http://localhost:${PORT}/exr-rate`);
+    });
+}
 
 
-// --- Scraping Functions ---
+// --- Utility Functions ---
 
 /**
  * Scrapes exchange rate data from the National Bank of Cambodia website for a given date.
@@ -473,6 +449,7 @@ function generateChartHtml(detailedRates, chartTitle) {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>${chartTitle}</title>
             <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
             <script src="https://cdn.tailwindcss.com"></script>
@@ -666,6 +643,140 @@ function generateHtmlTable(data, title) {
 }
 
 /**
+ * Saves the provided HTML content as a PNG image.
+ * @param {string} htmlContent - The HTML string to render and screenshot.
+ * @param {string} date - The exchange date for the filename.
+ * @param {boolean} [isFiltered=false] - Whether this is a filtered table, for filename differentiation.
+ * @param {boolean} [isCronJob=false] - Whether this is triggered by a cron job, for filename differentiation.
+ * @returns {Promise<string|null>} The path to the saved image file, or null if saving failed.
+ */
+async function saveHtmlTableAsImage(htmlContent, date, isFiltered = false, isCronJob = false) {
+    let browser;
+    try {
+        // For Vercel, we need to save to a temporary directory like /tmp
+        const imageDir = isCronJob ? '/tmp/images' : './images';
+        if (!fs.existsSync(imageDir)) {
+            fs.mkdirSync(imageDir, { recursive: true });
+            console.log(`Created directory: ${imageDir}`);
+        }
+
+        browser = await puppeteer.launch({ headless: 'new' });
+        const page = await browser.newPage();
+
+        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+
+        const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
+        await page.setViewport({ width: 1000, height: Math.max(bodyHeight, 800) });
+
+        const containerSelector = '.container';
+        const container = await page.$(containerSelector);
+
+        if (container) {
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:.]/g, '-');
+            let filenamePrefix = 'nbc_exchange_rate_table';
+            if (isFiltered) filenamePrefix = 'nbc_filtered_exchange_rate_table';
+            if (isCronJob) filenamePrefix = 'nbc_daily_report_table'; // Specific prefix for cron job images
+
+            const imagePath = path.join(imageDir, `${filenamePrefix}_${date.replace(/-/g, '_')}_${timestamp}.png`);
+
+            await container.screenshot({ path: imagePath, fullPage: false });
+            console.log(`HTML table image saved to ${imagePath}`);
+            return imagePath;
+        } else {
+            console.warn('Could not find the main container for screenshot. Skipping image save.');
+            return null;
+        }
+    } catch (screenshotError) {
+        console.error('Error saving HTML table as image:', screenshotError);
+        return null;
+    } finally {
+        if (browser) {
+            await browser.close();
+        }
+    }
+}
+
+/**
+ * Saves the provided data as a JSON file.
+ * @param {Object} data - The data object to save.
+ * @returns {Promise<string|null>} The path to the saved JSON file, or null if saving failed.
+ */
+async function saveJsonData(data) {
+    if (!data || !data.exchange_date) {
+        console.warn('No valid data or exchange date to save JSON.');
+        return null;
+    }
+
+    // For Vercel, saving to /tmp is the only way to write temporary files.
+    // These files will not persist between invocations.
+    const dataDir = process.env.NODE_ENV === 'production' ? '/tmp/data_json' : './data_json';
+    if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+        console.log(`Created directory: ${dataDir}`);
+    }
+
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[:.]/g, '-'); //YYYY-MM-DDTHH-MM-SS-SSSZ
+    const jsonFilename = `${dataDir}/nbc_exchange_rate_${data.exchange_date.replace(/-/g, '_')}_${timestamp}.json`;
+
+    try {
+        fs.writeFileSync(jsonFilename, JSON.stringify(data, null, 2), 'utf8');
+        console.log(`JSON data saved to ${jsonFilename}`);
+        return jsonFilename;
+    } catch (fileError) {
+        console.error('Error saving JSON data to file:', fileError);
+        return null;
+    }
+}
+
+/**
+ * Sends an image file to a Telegram chat.
+ * @param {string} imagePath - The local path to the image file.
+ * @param {string} caption - The caption for the image.
+ */
+async function sendImageToTelegram(imagePath, caption) {
+    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+        console.error('Telegram BOT_TOKEN or CHAT_ID is not set in environment variables. Skipping Telegram send.');
+        return;
+    }
+
+    if (!fs.existsSync(imagePath)) {
+        console.error(`Image file not found at ${imagePath}. Cannot send to Telegram.`);
+        return;
+    }
+
+    // FormData is required for sending files via multipart/form-data
+    // In a Vercel Node.js environment, 'form-data' library is typically needed.
+    // Make sure 'form-data' is installed: npm install form-data
+    const FormData = require('form-data');
+    const formData = new FormData();
+    formData.append('chat_id', TELEGRAM_CHAT_ID);
+    formData.append('photo', fs.createReadStream(imagePath), path.basename(imagePath));
+    formData.append('caption', caption);
+
+    const telegramApiUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
+
+    try {
+        const response = await fetch(telegramApiUrl, {
+            method: 'POST',
+            body: formData,
+            // node-fetch will automatically set Content-Type: multipart/form-data with boundary
+        });
+
+        const result = await response.json();
+        if (result.ok) {
+            console.log('Image successfully sent to Telegram!');
+        } else {
+            console.error('Failed to send image to Telegram:', result.description);
+        }
+    } catch (error) {
+        console.error('Error sending image to Telegram:', error);
+    }
+}
+
+
+/**
  * Scrapes exchange rate data from the NSSF website.
  * @returns {Promise<Object>} A promise that resolves to an object containing NSSF exchange rate data.
  */
@@ -762,3 +873,6 @@ async function scrapeExchangeRate() {
         }
     }
 }
+
+// Export the Express app for Vercel
+module.exports = app;
