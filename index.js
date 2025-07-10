@@ -319,15 +319,16 @@ app.get('/exr-rate', async (req, res) => {
 });
 
 // --- Server Start ---
-app.listen(PORT, function () {
-    console.log(`Server listening on port ${PORT}!`);
-    console.log(`Access NBC Exchange Rate (HTML Table, Image & JSON Save): http://localhost:${PORT}/nbc-exr-rate?date=2025-07-04`);
-    console.log(`Access Filtered NBC Exchange Rate (HTML Table & Image Save): http://localhost:${PORT}/nbc-filtered-exr-table?date=2025-07-04`);
-    console.log(`Access NBC Exchange Rate Chart (PNG): http://localhost:${PORT}/nbc-exr-chart?date=2025-07-04`);
-    console.log(`Access NSSF Exchange Rate (JSON): http://localhost:${PORT}/nssf-exr-rate`);
-    console.log(`Access GDT Exchange Rate (JSON): http://localhost:${PORT}/exr-rate`);
-});
+// app.listen(PORT, function () {
+//     console.log(`Server listening on port ${PORT}!`);
+//     console.log(`Access NBC Exchange Rate (HTML Table, Image & JSON Save): http://localhost:${PORT}/nbc-exr-rate?date=2025-07-04`);
+//     console.log(`Access Filtered NBC Exchange Rate (HTML Table & Image Save): http://localhost:${PORT}/nbc-filtered-exr-table?date=2025-07-04`);
+//     console.log(`Access NBC Exchange Rate Chart (PNG): http://localhost:${PORT}/nbc-exr-chart?date=2025-07-04`);
+//     console.log(`Access NSSF Exchange Rate (JSON): http://localhost:${PORT}/nssf-exr-rate`);
+//     console.log(`Access GDT Exchange Rate (JSON): http://localhost:${PORT}/exr-rate`);
+// });
 
+module.exports = app;
 
 // --- Scraping Functions ---
 
