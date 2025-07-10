@@ -14,7 +14,7 @@
 
 // Load environment variables from .env file
 require('dotenv').config();
-
+module.exports = app;
 const express = require('express');
 const puppeteer = require('puppeteer');
 const fs = require('fs'); // Node.js File System module to save the image and JSON
@@ -30,6 +30,7 @@ const GDT_WEBSITE = process.env.GDT_WEBSITE;
 
 // Middleware to parse JSON bodies (if needed for other routes, though not directly used here)
 app.use(express.json());
+
 
 // --- Express Routes ---
 
@@ -328,7 +329,7 @@ app.get('/exr-rate', async (req, res) => {
 //     console.log(`Access GDT Exchange Rate (JSON): http://localhost:${PORT}/exr-rate`);
 // });
 
-module.exports = app;
+
 
 // --- Scraping Functions ---
 
