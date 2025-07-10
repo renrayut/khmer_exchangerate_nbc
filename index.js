@@ -31,6 +31,9 @@ const GDT_WEBSITE = process.env.GDT_WEBSITE;
 // Middleware to parse JSON bodies (if needed for other routes, though not directly used here)
 app.use(express.json());
 
+app.get('/test', (req, res) => {
+    res.send('Test route works!');
+});
 
 // --- Express Routes ---
 
